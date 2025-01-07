@@ -1,0 +1,35 @@
+set output "temp_recent.jpeg"
+set term jpeg background "#FFFFFF" size 1200,900
+set title "Cryostat Monitoring"
+set xdata time
+set timefmt "%B %d %Y %H:%M:%S"
+set format x "%B %d %Y\n%H:%M:%S"
+set xrange [:]
+set xtics 28800
+
+set multiplot layout 3,1
+
+set ytics nomirror
+set y2tics
+set ylabel "Temperature (K)"
+set yrange[65:300]
+set y2label "Temperature (K)"
+set y2range[65:300]
+plot "textlog_recent.dat" using 1:9 title 'Cold Tip Temperature', \
+"textlog_recent.dat" using 1:7 title 'Cold Finger Temperature'
+
+set ylabel "Temperature (C)"
+set yrange[30:45]
+set y2label "Power (W)"
+set y2range[50:180]
+plot "textlog_recent.dat" using 1:11 title 'Cryocooler Power' axes x1y2, \
+"textlog_recent.dat" using 1:15 title 'Body Temperature' axes x1y1, \
+"textlog_recent.dat" using 1:13 title 'Collar Temperature' axes x1y1
+
+set ylabel "Temperature (C)"
+set yrange[20:30]
+set y2label "Temperature (C)"
+set y2range[20:30]
+plot "textlog_recent.dat" using 1:17 title 'Air Temperature'
+
+unset multiplot

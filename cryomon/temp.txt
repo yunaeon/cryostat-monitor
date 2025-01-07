@@ -1,0 +1,30 @@
+ PSH: argc= 1
+argv[0] = /home/grips/gse/trunk/ccgse
+ Error opening file asicmap0.txt
+ Error opening file asicmap1.txt
+ Error opening file asicmap2.txt
+ Error opening file asicmap3.txt
+ Error opening file asicmap4.txt
+ Error opening file asicmap5.txt
+ Error opening file asicmap6.txt
+ Error opening file asicmap7.txt
+ Error opening file e_cal.dat
+ loadflag: 1
+ Error loading energy calibrations; restoring defaults
+argc 1
+
+ === Starting to hear from Card Cages through ethernet ===  
+
+      ! < Eth-debug --  gcuAddress.sin_addr.s_addr = 0 > 
+
+   * Sockets Open 
+   # Binding Sockets... 
+ETH_SOCKET_ERROR 0 GCU
+   * server waiting , listen port is 40501
+
+
+   * Waiting for data frame..... 
+
+ -- terminating GSE ... 
+
+Closed CSV file
