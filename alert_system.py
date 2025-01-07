@@ -51,6 +51,9 @@ class alert_system():
         self.gse6_alert = False
         self.gse6_time = time.time()
 
+        self.sunpower_alert = False
+        self.sunpower_time = time.time()
+
         self.email_success = True
         self.emergency_list_updated = 0 # time of most recent alerts list update, or 0 if never updated
         self.gse_status_sent = time.gmtime(time.time()).tm_yday # displays day of the year gse email most recently sent
@@ -384,7 +387,42 @@ class alert_system():
 
 
 
+    def check_serial(self, port='/dev/ttyUSB0', baudrate=4800, bytesize=7, parity='O', stopbits=1, timeout=1.0, check_string='TC'):
+        import serial
+        try:
+            serial_port = serial.serial(port=port, baudrate=baudrate, bytesize=bytesize, parity=parity, stopbits=stopbits, timeout=timeout)
+        except IOError as e:
+            raise e
+        else:
+            serial_port.write(check_string)
+            recieved_string = serial_port.read(100)
+            serial_port.close()
+            if len(recieved_string) > 0:
+                return recieved_string
 
+
+    def test_sunpower_cryo(self, dt=None, f=None):
+        too_low = 0
+        too_high = 100
+        try:
+            recieved_string = self.check_serial(port='/dev/ttyUSB0', baudrate=4800, bytesize=7, parity='O', stopbits=1, timeout=1.0, check_string='TC')
+        except IOError as e:
+            pass # ignore IO errors, maybe should have an amount of time allowed to fail
+        recieved_float = float(recieved_string)
+        current_time = time.time()
+        if recieved_float > too_low or recieved_float < too_high:
+            # if good
+            self.sunpower_time = current_time
+            self.sunpower_alert = False
+            print ('Sunpower cryo is good temp!')
+            return
+        else:
+            if current_time - self.sunpower_time > dt and not self.sunpower_alert:
+                # add information about current temperature
+                self.email_success = self.SendPage(f'temporary bad temperature on sunpower cyrocooler controller. Outage time: {current_time - self.sunpower_time} s',category='c') and self.email_success
+                self.sunpower_alert = current_time
+                print ('sunpower is bad temp')
+                return
 
 
     # check updated GSE5 hotspot IP - > also alert; this means we have a problem with the hotspot
@@ -548,11 +586,12 @@ if __name__=="__main__":
         while True:
             s.copy_contact_list_remote() # look for changes in the contact list on the berkeley server, and copy them to the remote server if any changes exist
 #            s.check_hkp() # checks housekeeing values are in range and up to date on campaign server
-            s.check_telemetry_campaign_network() # checks power on on campaign site, telemetry ok, gsedb building on berkeley server
+            # s.check_telemetry_campaign_network() # checks power on on campaign site, telemetry ok, gsedb building on berkeley server
  #           s.check_hkp() # checks housekeeing values are in range and up to date on campaign server
             #s.check_hotspot_ip() # checks hotspot ip so we have it in case of power outage; alerts us if hotspot is down
-            s.check_gses() # check gse diskspace and email once per day
-            s.check_alive() # checks tha tremote (campaign) server is alive
+            # s.check_gses() # check gse diskspace and email once per day
+            # s.check_alive() # checks tha tremote (campaign) server is alive
+            s.test_sunpower_cryo()
             s.update_alive() # updates that berkeley server is alive and this check is working, including all emails
             time.sleep(args.sleep)
 
