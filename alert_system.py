@@ -7,19 +7,24 @@
 import time, smtplib,datetime,os
 from email.mime.text import MIMEText
 from paramiko import SSHClient, AutoAddPolicy
-from pybfsw.gse.gsequery import GSEQuery
+#from pybfsw.gse.gsequery import GSEQuery
 from pathlib import Path
 from slack_sdk import WebClient
-from pybfsw.payloads.gaps.mppt_alarms import mppt_alarms_list
+#from pybfsw.payloads.gaps.mppt_alarms import mppt_alarms_list
 from scp import SCPClient
 import json
+
+emergency_list_path = Path("/Users/sophiaw/alerts/emergency_message_list")
+if not emergency_list_path.exists():
+    print("Warning: emergency_message_list file not found.")
 
 
 cat_map = {'battery':3914,'v':3914,'network':3962,'power':3962,'d':3960,'o':4104,'trigger':4005}
 
 class alert_system():
-    def __init__(self, project="gaps", verbose=False, path = None,telemetry_dt = 60,alert_dt=20*60,remote_ip = None,remote_user = None,remote_pw = None,remote_port = None,alerts_dir="alerts",server_name=None,test_connections=False):
-
+    def __init__(self, project="gaps", verbose=False, path=None, telemetry_dt=60, alert_dt=20*60,
+                 remote_ip= None, remote_user= None, remote_pw= None, remote_port=None,
+                 alerts_dir="alerts", server_name = "default_server", test_connections = False):
         self.verbose = verbose
         self.telemetry_dt = telemetry_dt
         self.alert_dt = alert_dt
@@ -36,7 +41,8 @@ class alert_system():
             self.alerts_dir = Path.home() / alerts_dir # only must run on same user on both servers; otherwise, change this line to hardcode directory
         self.emergency_list =  self.alerts_dir / "emergency_message_list"
 
-        self.q = GSEQuery(project=project,path=path)
+        # GSEQuery instance 
+        # self.q = GSEQuery(project=project,path=path)
 
         # tracking success and errors
         self.telemetry = time.time() # time of most recent known good telemetry, or time program started
@@ -67,7 +73,7 @@ class alert_system():
             if not self.SendPage(f"Restarting {self.server_name} Server Alert System",category='d'): 
                 print ("Test Pages Failed! See debug log!")
             if not self.SendEmails(f"Restarting {self.server_name} Server Alert System",category='d'):
-                print ("TRest emails failed! See debug log!")
+                print ("Test emails failed! See debug log!")
             elif self.verbose: print ("successfully sent test emails upon startup")
 
             # test ssh connection to remote server
@@ -76,35 +82,35 @@ class alert_system():
                 self.SendPage(f"{self.server_name} ssh connection to {self.remote_ip}:{self.remote_port} is not working!", category='d')
             elif self.verbose: print (f'successfully tested ssh connection to {self.remote_ip}')
 
-    def SendPage(self,TxString,send=True,category=None,subject="GAPS Alert",continuing = False): 
+    def SendPage(self,TxString,send=True,category=None,subject="Cryostat Alert",continuing = False): 
        
         message = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S ") + self.server_name + " Server\n"+TxString
 
         # send slack message
-        try: 
+        try:
             if not continuing:
-                slack_client = WebClient(token=os.environ["GSE_SLACK_TOKEN"])
-                slack_client.chat_postMessage(channel="gse-automatic-monitoring",text=message, username="GSE alerts")
-        except: self.LogText("Slack not working")
+                slack_client = WebClient(token=os.environ.get("GSE_SLACK_TOKEN"))
+                if slack_client:
+                    slack_client.chat_postMessage(channel="gse-automatic-monitoring", text=message, username="GSE alerts")
+        except Exception as e:
+            self.LogText(f"Slack not working: {e}")
 
         try:
-            sn = os.environ["GSE_PAGEM_TOKEN"]
-            c = cat_map[category]
-            server = smtplib.SMTP("smtp.gmail.com",587)
+            #sn = os.environ.get("GSE_PAGEM_TOKEN")
+            c = cat_map.get(category, 0)
+            server = smtplib.SMTP("smtp.gmail.com", 587) #changed from 465 -> 587
             server.starttls()
-            server.login('gapsalerts@gmail.com',os.environ["GSE_GMAIL_TOKEN"])
+            server.login('sophii.wang@gmail.com', "yqbaucoiblaimzjq")
             msg = MIMEText(message)
-            msg['Subject'] = f'{sn}-{c}'
-            msg['From'] = 'gapsalerts@gmail.com'
-            msg['To'] = 'page@pagem.com' # send a page using pagem app
-            if send: server.sendmail('GAPS-monitor',msg['To'],msg.as_string())
-            server.close()
-            return True
+            msg['Subject'] = subject
+            msg['From'] = 'monitor@cryostat.com'
+            msg['To'] = self.msg_to
+            server.sendmail('sophii.wang@gmail.com', self.recipients, msg.as_string())
+            server.quit()
         except Exception as e:
-            print (e)
-        return False
+            self.LogText(f"Email not working: {e}")
 
-    def SendEmails(self,TxString,send=True,category=None,subject='GAPS Alert', continuing = False):
+    def SendEmails(self,TxString,send=True,category=None,subject= 'Cryostat Alert', continuing = False):
         message = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S ") + self.server_name + " Server\n"+TxString
         # send texts and emails
         TextList = []
@@ -129,15 +135,15 @@ class alert_system():
         try: 
             server = smtplib.SMTP("smtp.gmail.com",587)
             server.starttls()
-            server.login('gapsalerts@gmail.com',os.environ["GSE_GMAIL_TOKEN"])
+            server.login('sophii.wang@gmail.com',"yqbaucoiblaimzjq")
 
             for Person in TextList: 
                 try: 
                     msg = MIMEText(message)
                     msg['Subject'] = subject
-                    msg['From'] = "gapsalerts@gmail.com"
+                    msg['From'] = "monitor@cryostat.com"
                     msg['To'] = Person[1] + "@" + Person[2]
-                    if send: server.sendmail('GAPS-monitor',Person[1]+'@'+Person[2],msg.as_string())
+                    if send: server.sendmail('GRIPS-monitor',Person[1]+'@'+Person[2],msg.as_string())
 
                 except Exception as e:
                     print (e)
@@ -215,9 +221,7 @@ class alert_system():
 
         client.close()
         return True
-        
-  
-
+    
     def LogText(self,String):
         p = self.alerts_dir / "alerts_log"
         try:
@@ -443,7 +447,7 @@ class alert_system():
 
         category = 'battery'
         checklist = ["@vbat_pdu0","@vbat_pdu2","@vbat_pdu3"]
-        checklist = mppt_alarms_list+ checklist
+        checklist = mppt_alarms_list + checklist
         self.check_hkp_list(checklist,alarm_ranges = {},category=category,dt=dt,f=f)
 
         category = 'trigger'
@@ -456,7 +460,7 @@ class alert_system():
         self.check_hkp_list(checklist,alarm_ranges=alarm_ranges,category=category,dt=dt,f=f)
 
     def check_hkp_list(self,checklist,alarm_ranges={},dt=None,f=None,category=None):
-        
+
         if dt == None: dt = self.telemetry_dt
         if f == None: f = self.alert_dt
         
@@ -554,12 +558,18 @@ class alert_system():
         self.email_success = self.SendEmails(msg,category='g',subject = 'GAPS GSE Daily Health Check') and self.email_success
         self.gse_status_sent = yday
 
+#if __name__ == '__main__':
+    # alert_system = alert_system(verbose = True)
+    # print("Alert system initialized successfully")
+
 if __name__=="__main__":
 
     from argparse import ArgumentParser
     p = ArgumentParser()
-    p.add_argument("-p","--db_path",help="path to sqlite db, /sqlRAIT/db/gsedb.sqlite on the gfp machine, or 127.0.0.1:44555 on your laptop",default=os.environ["GSE_DB_PATH"],)
-    p.add_argument("--project", help='bfsw project name, a directory name in /path/to/bfsw/pybfsw/payloads',default=os.environ["GSE_PROJECT"])
+    p.add_argument("-p","--db_path",help="path to sqlite db", required = True)
+    # /sqlRAIT/db/gsedb.sqlite on the gfp machine, or 127.0.0.1:44555 on your laptop",default=os.environ["GSE_DB_PATH"],)
+    default_project = os.environ.get("GSE_PROJECT", "/Users/sophiaw/ssl grips/cryostat-monitor")
+    p.add_argument("--project", help='bfsw project name, a directory name in /path/to/bfsw/pybfsw/payloads', default=default_project)
     p.add_argument("-v", "--verbose", action="store_true")
     p.add_argument("-b", "--berkeley", action="store_true",help="run berkeley server alert system")
     p.add_argument("-c","--campaign", action="store_true",help="run campaign server alert system")
@@ -615,4 +625,11 @@ if __name__=="__main__":
 
     s = alert_system(telemetry_dt = args.telemetry_dt,alert_dt = args.alert_dt,path = args.db_path,project=args.project,verbose = args.verbose,alerts_dir=alerts_dir, remote_ip = args.remote_ip,remote_pw = args.remote_pw,remote_port=args.remote_port, remote_user = args.remote_user,server_name="Berkeley",test_connections = True)
     s.check_gses()
-    
+
+
+
+#to run: python alert_system.py --db_path "$DB_PATH" --remote_ip "127.0.0.1:44555" --remote_port 22222
+#current problem: <- because not connected to server?
+#Test Pages Failed! See debug log!
+#Test emails failed! See debug log!
+#Ssh connection is not working; check code
