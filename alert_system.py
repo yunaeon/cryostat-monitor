@@ -16,6 +16,7 @@ from slack_sdk import WebClient
 #from pybfsw.payloads.gaps.mppt_alarms import mppt_alarms_list
 from scp import SCPClient
 import json
+import pathlib
 
 emergency_list_path = Path("/Users/sophiaw/alerts/emergency_message_list")
 if not emergency_list_path.exists():
@@ -41,7 +42,7 @@ class alert_system():
         if isinstance(alerts_dir, Path):
             self.alerts_dir = alerts_dir
         else:
-            self.alerts_dir = Path.home() / alerts_dir # only must run on same user on both servers; otherwise, change this line to hardcode directory
+            self.alerts_dir = pathlib.Path(__file__).parents[1] / "alerts" # only must run on same user on both servers; otherwise, change this line to hardcode directory
         self.emergency_list =  self.alerts_dir / "emergency_message_list"
 
         # GSEQuery instance
@@ -591,7 +592,7 @@ if __name__=="__main__":
 
     if args.verbose: print (args)
 
-    alerts_dir = Path.home() / "alerts"
+    alerts_dir = pathlib.Path(__file__).parents[1] / "alerts"
 
     if args.berkeley and args.campaign:
         print ("Error! Please select either the berkeley server or the campaign server mode")
