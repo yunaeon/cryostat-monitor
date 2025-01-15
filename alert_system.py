@@ -1,8 +1,10 @@
 # this is used for monitoring telemetry and instrument health
 # relies on emergency_contact_list not packaged with bfsw, but should be installed in /home/gaps/config/alerts
-# systemd runs script in /home/gaps/config/alerts/berkeley_server_alerts.py (on berkeley server) or 
+# systemd runs script in /home/gaps/config/alerts/berkeley_server_alerts.py (on berkeley server) or
 # /home/gaps/config/alerts/campaign_server_alerts.py (on campaign server)
 # which are set up following the example in if name == main, but with the correct directory
+
+# python alert_system.py -b -p "/Users/scott/Documents/GRIPS/ged-sttc/lakeshore.sqlite" --project grips2 -v
 
 import time, smtplib,os
 from datetime import datetime, timezone
@@ -42,7 +44,7 @@ class alert_system():
             self.alerts_dir = Path.home() / alerts_dir # only must run on same user on both servers; otherwise, change this line to hardcode directory
         self.emergency_list =  self.alerts_dir / "emergency_message_list"
 
-        # GSEQuery instance 
+        # GSEQuery instance
         # self.q = GSEQuery(project=project,path=path)
 
         # tracking success and errors
@@ -71,7 +73,7 @@ class alert_system():
 
         if test_connections:
             # send test email to alert to server restart
-            if not self.SendPage(f"Restarting {self.server_name} Server Alert System",category='d'): 
+            if not self.SendPage(f"Restarting {self.server_name} Server Alert System",category='d'):
                 print ("Test Pages Failed! See debug log!")
             if not self.SendEmails(f"Restarting {self.server_name} Server Alert System",category='d'):
                 print ("Test emails failed! See debug log!")
@@ -83,8 +85,8 @@ class alert_system():
                 self.SendPage(f"{self.server_name} ssh connection to {self.remote_ip}:{self.remote_port} is not working!", category='d')
             elif self.verbose: print (f'successfully tested ssh connection to {self.remote_ip}')
 
-    def SendPage(self,TxString,send=True,category=None,subject="Cryostat Alert",continuing = False): 
-       
+    def SendPage(self,TxString,send=True,category=None,subject="Cryostat Alert",continuing = False):
+
         message = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S ") + self.server_name + " Server\n"+TxString
 
         # send slack message
@@ -112,9 +114,9 @@ class alert_system():
             self.LogText(f"Email not working: {e}")
 
     def SendEmails(self,TxString,send=True,category=None,subject= 'Cryostat Alert', continuing = False):
-        
+
         message = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S ") + self.server_name + " Server\n"+TxString
-        
+
         # send texts and emails
         TextList = []
         with self.emergency_list.open("r") as f:
@@ -135,13 +137,13 @@ class alert_system():
             self.SendPage(f"No category {category} emails to alert!",category='d')
             return False
 
-        try: 
+        try:
             server = smtplib.SMTP("smtp.gmail.com",587)
             server.starttls()
             server.login('sophii.wang@gmail.com',"yqbaucoiblaimzjq")
 
-            for Person in TextList: 
-                try: 
+            for Person in TextList:
+                try:
                     msg = MIMEText(message)
                     msg['Subject'] = subject
                     msg['From'] = "monitor@cryostat.com"
@@ -151,7 +153,7 @@ class alert_system():
                 except Exception as e:
                     print (e)
                     raise Exception("Could not send email to ",Person[0])
-                
+
         except Exception as e:
             print (e)
             raise Exception("Error connecting to gmail SMTP server")
@@ -160,13 +162,13 @@ class alert_system():
         return True
 
     def MakeSshClient(self,ip=None,user=None,port = None):
-        
+
         ssh_list = []
         if not self.remote_pw:
             keys_dir = Path.home() / ".ssh"
             ssh_list = keys_dir.glob('id_*')
             ssh_list = [str(f) for f in ssh_list if f.is_file and not ".pub" in str(f)]
-        
+
         if ip == None: ip = self.remote_ip
         if user == None: user = self.remote_user
         if port == None: port = self.remote_port
@@ -174,26 +176,26 @@ class alert_system():
         client = SSHClient()
         client.set_missing_host_key_policy(AutoAddPolicy())
 
-        if self.remote_pw: 
+        if self.remote_pw:
             try:
                 client.connect(ip,username=user,port=port,password=self.remote_pw)
                 return client
             except:
                 self.LogText(f"Cannot ssh into {ip} with port {port} and user {user} and remote pw")
                 return False
-        else: 
+        else:
             try:
                 client.connect(ip,username=user,port=port,look_for_keys=True,key_filename=ssh_list)
                 return client
-            except: 
+            except:
                 self.LogText(f"Cannot SSH into {ip} with port {port} and user {user} and ssh keys")
                 return False
 
     def TrySsh(self,ip=None,user=None,port = None,cmd_str=False):
-        
+
         output  = False
         client = self.MakeSshClient(ip=ip,user=user,port=port)
-        
+
         if not client:
             return False
         if cmd_str:
@@ -211,20 +213,20 @@ class alert_system():
         time_m = os.path.getmtime(str(self.emergency_list))
         if time_m < self.emergency_list_updated:
             return True
- 
+
         if self.verbose: print (f"Contact list updated on {self.server_name}; copying to remote")
         client = self.MakeSshClient(ip = ip, user=user,port=port)
-        if not client: 
+        if not client:
             self.LogText("Could not establish ssh connection to remote to copy emergency contact list")
             return False
-        
+
         with SCPClient(client.get_transport()) as scp:
             scp.put(str(self.emergency_list),str(self.emergency_list)) # fails if --remote_user is not the same as local user
             self.emergency_list_updated = time.time()
 
         client.close()
         return True
-    
+
     def LogText(self,String):
         p = self.alerts_dir / "alerts_log"
         try:
@@ -241,7 +243,7 @@ class alert_system():
         tables = self.q.get_table_names()
         for table in tables:
             _, res = self.q.get_latest_rows(table)
-            if not res == None: 
+            if not res == None:
                 latest_time = max(latest_time, res[0][1])
         return latest_time
 
@@ -263,7 +265,7 @@ class alert_system():
         for r in res.items():
             key = r[0]
             print (key)
-            if r[1] == None: 
+            if r[1] == None:
                 s = self.AlarmStringNoData(key)
                 no_data[key] = s
                 self.LogText(s)
@@ -274,7 +276,7 @@ class alert_system():
                 gcu_time = r[1][0]
                 ranges = [(r[1][2].low_alarm,r[1][2].high_alarm)]
                 if key in alarm_ranges: ranges = alarm_ranges[key]
-                if self.verbose: print (key,val, ranges)    
+                if self.verbose: print (key,val, ranges)
 
                 if time.time() - gcu_time > dt:
                     s = self.AlarmStringOldData(key,time.time() - gcu_time)
@@ -282,7 +284,7 @@ class alert_system():
                     self.LogText(s)
 
                 goodValue = False
-                for r in ranges: 
+                for r in ranges:
                     if (r[0] is None or val >= r[0]) and (r[1] is None or val <= r[1]):
                         goodValue = True
                 if not goodValue:
@@ -294,7 +296,7 @@ class alert_system():
 
     def AlarmStringNoData(self,key):
         return f"No data for {key} in gsedb! Instrument health monitoring is compromised!"
-        
+
     def AlarmStringOldData(self,key,time):
         time = round(time)
         return f"{key} data is {time} s out of date and instrument monitoring is not valid!"
@@ -318,7 +320,7 @@ class alert_system():
 
         # if telemetry looks good, then the gsedb is good and also that means network and power are ok on campaign
         if current_time - latest_db_time < dt:
-            
+
             # if telemetry and/or power/network was previously bad, then send an update that we're good now
             if self.campaign_network_alert:
                 self.email_success = self.SendPage(f"Power or network is restored for GAPS Campaign site, and Telemetry is restored. Power outage time: {current_time - self.campaign_network} s",category=category) and self.email_success
@@ -331,7 +333,7 @@ class alert_system():
             self.campaign_network = current_time
             self.campaign_network_alert = False
             self.telemetry_alert = False
-            
+
             if self.verbose: print (current_time,"telemetry all good!")
             return True
 
@@ -364,14 +366,14 @@ class alert_system():
         elif current_time - self.campaign_network_alert > f:
             self.email_success = self.SendPage(f'Campaign network or power outage is ongoing.',category=category, continuing=True) and self.email_success
             self.telemetry_alert = current_time
-        else: 
+        else:
             pass
         if self.verbose: print ("network outage on campaign gse network")
         return False
 
     def test_gse6(self,dt=None,f=None):
         success = self.TrySsh(ip='192.168.36.6',user='gaps') # ,ip=None,user=None,port = None,cmd_str=False
-        if dt == None: dt = self.telemetry_dt         
+        if dt == None: dt = self.telemetry_dt
         if f == None: f = self.alert_dt
         category = 'c'
         current_time = time.time()
@@ -441,10 +443,10 @@ class alert_system():
 
     # check if data is out of bounds, we get alerts about data out of bounds
     def check_hkp(self,dt = None,f = None):
-        
+
         if dt == None: dt = self.telemetry_dt
         if f == None: f = self.alert_dt
-        
+
         #if not self.check_telemetry_campaign_network(dt = dt, f = f):
         #    return
 
@@ -466,17 +468,17 @@ class alert_system():
 
         if dt == None: dt = self.telemetry_dt
         if f == None: f = self.alert_dt
-        
+
         current_time = time.time()
         hkp_issues = self.CheckInstrumentHealth(checklist,alarm_ranges=alarm_ranges)
 
         # no current or previous problem
         if not hkp_issues and not self.inst_hkp_alert[category]:
             if self.verbose: print (f"category {category} checklist all good:",checklist)
-            return 
+            return
 
         # all old problem(s) resolved; no new problems
-        if not hkp_issues: 
+        if not hkp_issues:
             self.email_success = self.SendPage(f"Category {category} instrument Health Issues resolved! {category} hkp is OK!",category=category) and self.email_success
             self.inst_hkp_alert[category] = False
             self.inst_hkp[category] = time.time()
@@ -486,21 +488,21 @@ class alert_system():
         first_key = next(iter(hkp_issues))
         n = len(hkp_issues.keys())
         msg = str(hkp_issues[first_key])
-        if n > 1: 
+        if n > 1:
             msg = msg +  f"; {n} total instrument health issues\n"
             for key in hkp_issues:
                 msg = msg + hkp_issues[key] + "\n"
 
         if not self.inst_hkp_alert[category]: # no old problems
             self.email_success = self.SendPage(msg,category=category) and self.email_success
-            self.inst_hkp_alert[category] = current_time # time of most recent alert sent out 
-        elif current_time - self.inst_hkp_alert[category] > f: 
+            self.inst_hkp_alert[category] = current_time # time of most recent alert sent out
+        elif current_time - self.inst_hkp_alert[category] > f:
             self.email_success = self.SendPage("Continuing " + msg,category=category,continuing =True) and self.email_success
             self.inst_hkp_alert[category] = current_time
         return
 
     def update_alive(self):
-        if self.email_success: 
+        if self.email_success:
             self.IAmAlive()
             if self.verbose: print ("updating i'm alive!\n")
         else:
@@ -515,12 +517,12 @@ class alert_system():
 
         current_time = time.time()
         p = str(self.alerts_dir / "im_alive")
- 
+
         if (current_time - self.remote_alive  > ssh_dt):
             remote_alive_time = self.TrySsh(cmd_str=f"cat {p}")
             if self.verbose: print ('testing remote alive over ssh; returns', remote_alive_time)
             try: self.remote_alive = float(remote_alive_time)
-            except: 
+            except:
                 if self.verbose: print ("could not convert to a time ssh failed")
         elif self.verbose: print (f"last successful ssh was {current_time - self.remote_alive} s ago; skipping remote alive test")
 
@@ -530,13 +532,13 @@ class alert_system():
 
         # if remote is alive
         if delta_remote < dt:
-            
+
             if self.remote_alive_alert:
                 self.SendPage(f"alert system on {self.remote_ip} is back online!",category='network')
                 self.remote_alive_alert = False
 
             if self.verbose: print (f"remote {self.remote_ip} reports alert system alive {round(delta_remote,1)} s ago!")
-            return 
+            return
 
         # remote alert server is down, or cannot access remote server
         if not self.remote_alive_alert:
