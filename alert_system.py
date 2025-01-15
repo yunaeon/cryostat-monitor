@@ -4,7 +4,8 @@
 # /home/gaps/config/alerts/campaign_server_alerts.py (on campaign server)
 # which are set up following the example in if name == main, but with the correct directory
 
-import time, smtplib,datetime,os
+import time, smtplib,os
+from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from paramiko import SSHClient, AutoAddPolicy
 #from pybfsw.gse.gsequery import GSEQuery
@@ -84,7 +85,7 @@ class alert_system():
 
     def SendPage(self,TxString,send=True,category=None,subject="Cryostat Alert",continuing = False): 
        
-        message = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S ") + self.server_name + " Server\n"+TxString
+        message = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S ") + self.server_name + " Server\n"+TxString
 
         # send slack message
         try:
@@ -111,7 +112,9 @@ class alert_system():
             self.LogText(f"Email not working: {e}")
 
     def SendEmails(self,TxString,send=True,category=None,subject= 'Cryostat Alert', continuing = False):
-        message = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S ") + self.server_name + " Server\n"+TxString
+        
+        message = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S ") + self.server_name + " Server\n"+TxString
+        
         # send texts and emails
         TextList = []
         with self.emergency_list.open("r") as f:

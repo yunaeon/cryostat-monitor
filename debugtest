@@ -1,0 +1,19 @@
+import smtplib
+from email.mime.text import MIMEText
+
+message = "This is a test email sent from Python."
+subject = "Test Email"
+msg_to = "sophii.wang@gmail.com"  # Replace with the recipient's email
+recipients = [msg_to]
+
+server = smtplib.SMTP("smtp.gmail.com", 587) #changed from 465 -> 587
+server.starttls()
+server.login('sophii.wang@gmail.com', "yqbaucoiblaimzjq")
+msg = MIMEText(message)
+msg['Subject'] = subject
+msg['From'] = 'monitor@cryostat.com'
+msg['To'] = ", ".join(recipients)
+server.sendmail('sophii.wang@gmail.com', recipients, msg.as_string())
+server.quit()
+
+print("Email sent successfully!")
